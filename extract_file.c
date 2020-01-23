@@ -48,12 +48,17 @@ void process_packet(u_char * user, const struct pcap_pkthdr * h, const u_char * 
 		fname = (char *)malloc(payload_len);
 		memset(fname, '\0', payload_len);
 		strncpy(fname, payload_offset + 5, payload_len);
-		if(strrchr(fname, '/') == NULL)
+		if(strrchr(fname, '/') == NULL){
+			printf("Found file named %s of size %lu bytes.\n", fname, size);
 			fd = open(fname, O_CREAT | O_WRONLY | O_TRUNC, 0777);
-		else	fd = open(strrchr(fname, '/') + 1, O_CREAT | O_WRONLY | O_TRUNC, 0777);
+		}
+		else{
+			printf("Found file named %s of size %lu bytes.\n", strrchr(fname, '/') + 1, size);
+			fd = open(strrchr(fname, '/') + 1, O_CREAT | O_WRONLY | O_TRUNC, 0777);	
+		}
 		memset(fname, '\0', payload_len);
 		free(fname);
-		
+
 		ret = 1;
 		return;
 	}
@@ -61,9 +66,13 @@ void process_packet(u_char * user, const struct pcap_pkthdr * h, const u_char * 
 	if(flag == 1 && payload_len != 0){
 		ret = write(fd, payload_offset, payload_len);
 		wr += ret;
+		printf("Extracting...%lu bytes.\n", wr);
 		if(wr == size){
 			flag = ret = wr = 0;
+			printf("File has been extracted.\n");
+			printf("-----------------------------------\n");
 			close(fd);
+			count++;
 		}
 	}
 
@@ -85,8 +94,11 @@ int main(int argc, char ** argv){
 		handle = pcap_open_offline(argv[1], errbuf);
 		if(handle == NULL)
 			printf("%s : File not found\n",argv[1]);
-		else
+		else{
+			printf("Analyzing pcap file %s for files...\n", argv[1]);
 			pcap_loop(handle, -1, process_packet, NULL);
+			printf("File extraction complete. Total %d files found\n", count);
+		}
 	}
 	return 0;
 }
