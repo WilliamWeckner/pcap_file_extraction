@@ -17,20 +17,21 @@ struct iphdr * ip = NULL;
 struct tcphdr * tcp = NULL;
 
 char *fname, *payload_offset = NULL;
-int count, flag, fd, ret, pkt_len, payload_len = 0;
+int count, flag, fd, ret, payload_len = 0;
 int hdr_len = sizeof(struct ether_header) + sizeof(struct iphdr);
 unsigned long size, wr = 0;
 
 void process_packet(u_char * user, const struct pcap_pkthdr * h, const u_char * bytes){
 	eth = (struct ether_header *)(bytes);
+	// check for IPv4 
 	if(ntohs(eth->ether_type) != 2048)	return;
 
 	ip = (struct iphdr *)(bytes + sizeof(struct ether_header));
+	// check for TCP 
 	if(ip->protocol != 6)	return;
 
-	tcp = (struct tcphdr *)(bytes + sizeof(struct ether_header) + sizeof(struct iphdr));
+	tcp = (struct tcphdr *)(bytes + hdr_len);
 
-	pkt_len = ntohs(ip->tot_len) - sizeof(struct iphdr);
 	payload_len = h->caplen - (hdr_len + 4 * tcp->doff);
 	payload_offset = bytes + hdr_len + 4 * tcp->doff;
 
@@ -39,9 +40,11 @@ void process_packet(u_char * user, const struct pcap_pkthdr * h, const u_char * 
 		return;
 	}
 
+	//get file size
 	if(!strncmp("213", payload_offset, 3) && size == 1)
 		size = strtoul(payload_offset + 4, NULL, 10);
 
+	//get filename & create file 
 	if(!strncmp("RETR", payload_offset, 4)){
 		payload_len = payload_len - 7;
 		
@@ -63,6 +66,7 @@ void process_packet(u_char * user, const struct pcap_pkthdr * h, const u_char * 
 		return;
 	}
 	
+	// write contents of file 
 	if(flag == 1 && payload_len != 0){
 		ret = write(fd, payload_offset, payload_len);
 		wr += ret;
@@ -76,6 +80,7 @@ void process_packet(u_char * user, const struct pcap_pkthdr * h, const u_char * 
 		}
 	}
 
+	// check for file transfer completion 
 	if((!strncmp("150", payload_offset, 3)) && (ret == 1)){
 		flag = 1;
 		ret = 0;
